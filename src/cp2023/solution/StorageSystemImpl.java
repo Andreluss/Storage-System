@@ -6,9 +6,9 @@ import cp2023.base.DeviceId;
 import cp2023.base.StorageSystem;
 import cp2023.exceptions.*;
 
-import javax.swing.plaf.basic.ComboPopup;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
+import java.util.concurrent.BrokenBarrierException;
+import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Semaphore;
 
 public class StorageSystemImpl implements StorageSystem {
@@ -69,7 +69,7 @@ public class StorageSystemImpl implements StorageSystem {
     protected Device deletionDevice = new UnlimitedDevice();
     protected Map<DeviceId, Device> deviceMap = new HashMap<>();
     protected Map<ComponentId, Component> componentMap = new HashMap<>();
-    protected Semaphore mutex = new Semaphore(1);
+    protected Semaphore mutex = new Semaphore(1, true);
 
     private Device getSourceDevice (DeviceId sourceDeviceId) throws DeviceDoesNotExist {
         return getDevice(sourceDeviceId, creationDevice);
@@ -154,6 +154,8 @@ public class StorageSystemImpl implements StorageSystem {
         return new TransferWrapper(sourceDevice, destinationDevice, component, transfer);
     }
 
+
+
     /**
      * @param transfer new transfer to be executed
      * @throws TransferException if the transfer is not valid
@@ -173,16 +175,160 @@ public class StorageSystemImpl implements StorageSystem {
                 throw e;
             }
 
-
-            mutex.release();
-
-
+            // Set the state of this component to being transferred.
+            transferWrapper.component.setTransferred(true);
 
 
+            if (transferWrapper.destinationDevice.hasFreeSlots()) {
+                // Update destination device
+                transferWrapper.destinationDevice.occupyNewSlot();
+                // and run this transfer without mutex.
+                mutex.release();
+
+                transfer.prepare();
+                transfer.perform(); transferWrapper.markAsFinished();
+
+                // Acquire mutex to update the state of sourceDevice and possible run another waiting transfer.
+                mutex.acquire();
+                releaseNextTransferIfWaitingAndUpdateTheDevice(transferWrapper); // (releases the mutex)
+            }
+            else {
+                // There are 2 cases:
+                // (1) there is a cycle, created by this transfer
+                // (2) the transfer has to wait for prepare() and maybe for perform() too (if it's in a cycle).
+
+                var cycle = findCycle(transferWrapper);
+                if (cycle != null) { /* (1) there is a cycle, created by this transfer */
+                    // Prepare and perform the whole cycle.
+                    mutex.release();
+                    transfer.prepare();
+
+                    // Make a cyclePerformBarrier to run perform() on transfers only when all of them have already run prepare().
+                    CyclicBarrier cyclePerformBarrier = new CyclicBarrier(cycle.size() + 1);
+
+                    for (var otherTransferWrapper : cycle) {
+                        otherTransferWrapper.setInCycle(true);
+                        otherTransferWrapper.setCycleBarrier(cyclePerformBarrier);
+                        otherTransferWrapper.waitPrepare.release();
+                    }
+
+                    // Wait until all transfers in cycle are prepared.
+                    cyclePerformBarrier.await();
+
+                    transfer.perform(); transferWrapper.markAsFinished();
+                    // Other transfers in cycle will run their perform() as well, because of released cyclePerformBarrier.
+                }
+                else { /* (2) the transfer has to wait for prepare() */
+                    // Add this transfer to destinationDevice's waiting list.
+                    transferWrapper.destinationDevice.waiting.add(transferWrapper);
+                    mutex.release();
+
+                    transferWrapper.waitPrepare.acquire();
+                    transfer.prepare();
+
+                    if (transferWrapper.isInCycle()) {
+                        assert transferWrapper.getCycleBarrier() != null;
+                        transferWrapper.getCycleBarrier().await();
+                    }
+
+                    // transferWrapper.waitPerform.acquire();
+                    transfer.perform(); transferWrapper.markAsFinished();
+                    // if we shouldn't run perform() in mutex, than let's do markAsFinished() update just after the function call
+
+                    if (!transferWrapper.isInCycle()) {
+                        mutex.acquire();
+                        // No other transfer has been scheduled to be performed just after this one,
+                        // so we can run the longest-waiting one, if there is one.
+                        releaseNextTransferIfWaitingAndUpdateTheDevice(transferWrapper);
+                        mutex.release();
+                    } // Otherwise do nothing, since there will be next transfer coming to this sourceDevice in a moment.
+                }
+            }
 
 
-        } catch (InterruptedException e) {
+            // After all steps, the transfer was successful, and we can finally update
+            // the component's state and location.
+//            mutex.acquire();
+//            transferWrapper.markAsFinished();
+//            mutex.release();
+
+
+
+        } catch (InterruptedException | BrokenBarrierException e) {
             throw new RuntimeException("panic: unexpected thread interruption");
         }
     }
+
+    /**
+     * Resumes the longest-waiting transfer from the sourceDevice of transferWrapper.
+     * Should be run with mutex acquired; after this function mutex is released.
+     * @param transferWrapper transferWrapper with sourceDevice, which may contain other transfers waiting
+     */
+    private void releaseNextTransferIfWaitingAndUpdateTheDevice(TransferWrapper transferWrapper) {
+        if (!transferWrapper.sourceDevice.waiting.isEmpty()) {
+            var nextTransferWrapper = transferWrapper.sourceDevice.waiting.removeFirst();
+            mutex.release();
+            nextTransferWrapper.waitPrepare.release();
+        }
+        else {
+            transferWrapper.sourceDevice.releaseNewSlot();
+            mutex.release();
+        }
+    }
+
+
+    private List<TransferWrapper> findCycleDFS(Device currentDevice, Set<Device> visited, Device cycleNode) {
+        visited.add(currentDevice);
+
+        var iter = currentDevice.waiting.iterator();
+        while (iter.hasNext()) {
+            var transferWrapper = iter.next();
+
+            var nextDevice = transferWrapper.sourceDevice;
+            if (!visited.contains(nextDevice)) {
+                var maybeCycle = findCycleDFS(nextDevice, visited, cycleNode);
+
+                if (maybeCycle != null) {
+                    // Add current transfer to the cycle.
+                    maybeCycle.add(transferWrapper);
+                    // Remove this transfer from waiting list on this device.
+                    iter.remove();
+
+                    return maybeCycle;
+                }
+            }
+            else if (nextDevice == cycleNode) {
+                // Start the cycle.
+                var cycle = new ArrayList<TransferWrapper>();
+
+                // Add current transfer to the cycle.
+                cycle.add(transferWrapper);
+                // Remove this transfer from waiting list on this device.
+                iter.remove();
+
+                return cycle;
+            }
+            else {
+                System.out.println("WEIRD-ERROR the cycle should be only found when trying to visit cycleNode");
+//                throw new UnexpectedException("The cycle should be only found when trying to visit cycleNode");
+            }
+        }
+        return null;
+    }
+
+    private List<TransferWrapper> findCycle(TransferWrapper firstTransfer) {
+        HashSet<Device> visited = new HashSet<>();
+        visited.add(firstTransfer.destinationDevice);
+
+        var cycle = findCycleDFS(firstTransfer.sourceDevice, visited, firstTransfer.destinationDevice);
+        if (cycle != null) {
+//            cycle.add(firstTransfer); this is the real beginning of the cycle
+            // Reverse to get the right order,
+            // with [the first transfer freed after firstTransfer] at the beginning.
+            Collections.reverse(cycle);
+        }
+
+        return cycle;
+    }
+
 }

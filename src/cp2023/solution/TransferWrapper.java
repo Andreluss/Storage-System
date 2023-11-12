@@ -2,20 +2,23 @@ package cp2023.solution;
 
 import cp2023.base.ComponentTransfer;
 
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.Semaphore;
+
 public class TransferWrapper {
-    protected Device sourceDevice;
-
-    public Device getSourceDevice() {
-        return sourceDevice;
+    /**
+     * @return true, when this transfer will be performed in a cycle, and it shouldn't release space in its device and run another transfer.
+     */
+    public boolean isInCycle() {
+        return inCycle;
     }
 
-    public Device getDestinationDevice() {
-        return destinationDevice;
+    public void setInCycle(boolean inCycle) {
+        this.inCycle = inCycle;
     }
 
-    public Component getComponent() {
-        return component;
-    }
+    private boolean inCycle = false;
+    public Semaphore waitPrepare = new Semaphore(0);
 
     public TransferWrapper(Device sourceDevice, Device destinationDevice, Component component, ComponentTransfer transfer) {
         this.sourceDevice = sourceDevice;
@@ -24,12 +27,21 @@ public class TransferWrapper {
         this.transfer = transfer;
     }
 
-    protected Device destinationDevice;
-    protected Component component;
+    public final Device sourceDevice;
+    public final Device destinationDevice;
+    public final Component component;
+    public final ComponentTransfer transfer;
 
-    public ComponentTransfer getTransfer() {
-        return transfer;
+    private CyclicBarrier cycleBarrier;
+    public void setCycleBarrier(CyclicBarrier cycleBarrier) {
+        this.cycleBarrier = cycleBarrier;
+    }
+    public CyclicBarrier getCycleBarrier() {
+        return cycleBarrier;
     }
 
-    ComponentTransfer transfer;
+    public void markAsFinished() {
+        component.setTransferred(false);
+        component.setLocation(destinationDevice);
+    }
 }
