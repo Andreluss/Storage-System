@@ -19,18 +19,8 @@ public final class StorageSystemFactory {
     public static StorageSystem newSystem(
             Map<DeviceId, Integer> deviceTotalSlots,
             Map<ComponentId, DeviceId> componentPlacement) {
-        // FIXME: implement
-        // TODO: process errors of wrong ids etc.
-        // 1. Validation:
-        // - everything not null
-        // - totalSlots > 0  ???? jednak nie >= 0
-        // - componentPlacement deviceID -> *exists* in deviceTotalSlots
-        // - each componentId in componentPlacement is *unique*
-        // - deviceID capacity not exceeded
-
-        // 2. Creation of StorageSystemImpl
-        //
-        throw new RuntimeException("not implemented");
+        // Create storage system, validation is done inside constructor, can throw errors.
+        return new StorageSystemImpl(deviceTotalSlots, componentPlacement);
     }
 
 }
