@@ -1,6 +1,16 @@
 package cp2023.solution;
 
 public class Component {
+    public boolean isTransferred() {
+        return transferred;
+    }
+
+    public void setTransferred(boolean transferred) {
+        this.transferred = transferred;
+    }
+
+    private boolean transferred = false;
+
     public Device getLocation() {
         return location;
     }

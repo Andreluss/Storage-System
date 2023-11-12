@@ -1,11 +1,21 @@
 package cp2023.solution;
 
 public class Device {
-    public int getFreeSlots() {
-        return freeSlots;
+    public boolean hasFreeSlots() {
+        return freeSlots > 0;
     }
 
-    public Integer freeSlots;
+    public void occupyNewSlot() {
+        this.freeSlots -= 1;
+    }
+
+    public void releaseNewSlot() {
+        this.freeSlots += 1;
+    }
+
+
+
+    protected Integer freeSlots;
     public Device(Integer freeSlots) {
         this.freeSlots = freeSlots;
     }
