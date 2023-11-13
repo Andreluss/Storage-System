@@ -31,7 +31,7 @@ public class StorageSystemImpl implements StorageSystem {
             if (!(freeSlots >= 1))
                 throw new IllegalArgumentException("Device must have capacity >= 1");
 
-            deviceMap.put(deviceId, new Device(freeSlots));
+            deviceMap.put(deviceId, new Device(freeSlots, deviceId));
         }
 
 
@@ -65,8 +65,8 @@ public class StorageSystemImpl implements StorageSystem {
         }
     }
 
-    protected Device creationDevice = new UnlimitedDevice();
-    protected Device deletionDevice = new UnlimitedDevice();
+    protected Device creationDevice = new UnlimitedDevice(new DeviceId(-111));
+    protected Device deletionDevice = new UnlimitedDevice(new DeviceId(-222));
     protected Map<DeviceId, Device> deviceMap = new HashMap<>();
     protected Map<ComponentId, Component> componentMap = new HashMap<>();
     protected Semaphore mutex = new Semaphore(1, true);
@@ -309,7 +309,9 @@ public class StorageSystemImpl implements StorageSystem {
                 return cycle;
             }
             else {
-                System.out.println("WEIRD-ERROR the cycle should be only found when trying to visit cycleNode");
+                // it's ok, we do nothing, we already visited this device with no effect,
+                // we're here again probably because of multiple transfers from this device
+//                System.out.println("WEIRD-ERROR the cycle should be only found when trying to visit cycleNode");
 //                throw new UnexpectedException("The cycle should be only found when trying to visit cycleNode");
             }
         }

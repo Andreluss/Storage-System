@@ -1,5 +1,7 @@
 package cp2023.solution;
 
+import cp2023.base.DeviceId;
+
 import java.util.*;
 
 public class Device {
@@ -18,7 +20,10 @@ public class Device {
     public final LinkedList<TransferWrapper> waiting = new LinkedList<>();
 
     protected Integer freeSlots;
-    public Device(Integer freeSlots) {
+    private final DeviceId deviceId;
+
+    public Device(Integer freeSlots, DeviceId deviceId) {
         this.freeSlots = freeSlots;
+        this.deviceId = deviceId;
     }
 }

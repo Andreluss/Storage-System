@@ -1,8 +1,10 @@
 package cp2023.solution;
 
+import cp2023.base.DeviceId;
+
 public class UnlimitedDevice extends Device {
-    public UnlimitedDevice() {
-        super(Integer.MAX_VALUE);
+    public UnlimitedDevice(DeviceId deviceId) {
+        super(Integer.MAX_VALUE, deviceId);
     }
 
     @Override
