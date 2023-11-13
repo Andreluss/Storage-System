@@ -20,7 +20,7 @@ public class Device {
     public final LinkedList<TransferWrapper> waiting = new LinkedList<>();
 
     protected Integer freeSlots;
-    private final DeviceId deviceId;
+    private final DeviceId deviceId; // for debug
 
     public Device(Integer freeSlots, DeviceId deviceId) {
         this.freeSlots = freeSlots;
