@@ -308,12 +308,12 @@ public class StorageSystemImpl implements StorageSystem {
 
                 return cycle;
             }
-            else {
+            //else {
                 // it's ok, we do nothing, we already visited this device with no effect,
                 // we're here again probably because of multiple transfers from this device
 //                System.out.println("WEIRD-ERROR the cycle should be only found when trying to visit cycleNode");
 //                throw new UnexpectedException("The cycle should be only found when trying to visit cycleNode");
-            }
+            //}
         }
         return null;
     }
