@@ -6,7 +6,8 @@ This is a project written in Java, consisting of the solution code and sample te
 ## About
 This project is an implementation of a concurrent storage system in Java. 
 It is designed to coordinate data transfers between devices while ensuring safety and liveness properties. 
-The system can handle different types of operations on data components, such as adding, moving, and deleting, and prevent any conflicts or inconsistencies.
+The system can handle different types of operations on data components, such as adding, moving, and deleting, and prevent any conflicts or inconsistencies.  
+Original problem description: [here](https://www.mimuw.edu.pl/~iwanicki/courses/cp/2023/)
 
 ## Features
 - **Concurrent Data Transfers:** The system can manage multiple data transfers concurrently, ensuring efficient use of resources.
@@ -16,4 +17,4 @@ The system can handle different types of operations on data components, such as 
 
 ## Demo
 Reference the [demo](src/cp2023/demo/) folder for more.
- 
+
